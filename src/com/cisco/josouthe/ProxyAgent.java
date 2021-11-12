@@ -15,6 +15,8 @@ import org.apache.logging.log4j.core.config.Configurator;
 import javax.net.ssl.*;
 import java.net.*;
 
+import java.nio.file.FileSystems;
+import java.nio.file.WatchService;
 import java.security.KeyStore;
 import java.util.*;
 import java.io.*;
@@ -68,6 +70,31 @@ public class ProxyAgent {
         int port = Integer.parseInt(props.getProperty("serverPort", "9999"));
         logger.info("Configuring Proxy Listener for Protocol: "+ proxyProtocol);
         switch (proxyProtocol) {
+            case "logfiles": {
+                WatchService watcher;
+                try {
+                    watcher = FileSystems.getDefault().newWatchService();
+                } catch (IOException e) {
+                    logger.fatal("IO Exception while getting a new file watcher service, exiting: "+ e.getMessage());
+                    return;
+                }
+                ArrayList<LogDirectoryFollower> logFollowers = new ArrayList<>();
+                boolean weStillHaveEntries = true;
+                int count=0;
+                while( weStillHaveEntries ) {
+                    if( props.getProperty("logfiles."+count+".filenames", "not-set").equals("not-set") ) {
+                        weStillHaveEntries = false;
+                    } else {
+                        try {
+                            logFollowers.add(new LogDirectoryFollower(count, props, watcher));
+                        } catch (ConfigurationException configurationException) {
+                            logger.warn("Error setting up log file watcher, in configuration: " + configurationException.getMessage());
+                        }
+                        count++;
+                    }
+                }
+                break;
+            }
             case "tcp-socket": {
                 try {
                     ServerSocket serverSocket = null;
